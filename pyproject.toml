@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "txtest"
+version = "0.0.1"
+description = "Unit testing for texts, courses, articles, and research."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Thiago Nepomuceno", email = "thiago@neps.academy" }]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+keywords = ["text", "testing", "validation", "unit-testing"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Text Processing",
+]
+dependencies = [
+    "click>=8.1.7",
+    "rich>=13.9.4",
+    "Jinja2>=3.1.4",
+    "PyYAML>=6.0.2",
+    "python-dotenv>=1.0.1",
+]
+
+[project.scripts]
+txtest = "txtest.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

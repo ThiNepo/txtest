@@ -1,0 +1,19 @@
+---
+description: Explains where and how to cancel a reservation, including the deadline.
+type: predicate
+min_probability: 0.5
+---
+<system>
+Does the policy explicitly tell a member where to cancel a desk reservation, which action completes the cancellation, and when cancellation is allowed?
+
+The condition is satisfied only when all three details are present:
+- Where to go, such as a named page or service desk.
+- What to do there to cancel the booking.
+- The cancellation deadline or an explicit statement that cancellation is always allowed.
+
+A statement that cancellations are possible is insufficient. Releasing a reservation after a missed check-in does not explain how a member can cancel it. Evaluate only the supplied policy; do not infer missing steps from how other reservation systems work.
+</system>
+
+<user>
+{{ text }}
+</user>

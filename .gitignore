@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.env
+.env.*
+!.env.example
+.pytest_cache/
+.coverage
+
+# Local evaluation material and workspace settings.
+/texts/
+/docs/reviews/
+/txtests/lessons/
+/teste-decisions-api/
+*.code-workspace

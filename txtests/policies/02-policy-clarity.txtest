@@ -1,0 +1,27 @@
+---
+description: Members can book, cancel, and check in without guessing missing instructions.
+type: score
+min_score: 4
+levels:
+  - label: "1"
+    description: The policy does not explain how to complete any of the three tasks, or contradictory instructions make it unusable.
+  - label: "2"
+    description: Only one task can be completed from the policy; the other two omit essential actions, locations, or timing rules.
+  - label: "3"
+    description: Two tasks can be completed from the policy, but one task omits an essential action, location, or timing rule.
+  - label: "4"
+    description: All three tasks include the actions, locations, and timing needed to complete them, but one instruction requires rereading to connect it to its task.
+  - label: "5"
+    description: All three tasks include the actions, locations, and timing needed to complete them, and each sequence is easy to locate and follow on the first reading.
+---
+<system>
+How clearly does the policy enable a library member to complete these three tasks: book a desk, cancel a booking, and check in on arrival?
+
+Assess whether the member can find the relevant instructions and carry out each task using only the policy. A task needs a stated place or channel, the actions to take, and the timing rules that govern it. Do not invent missing instructions. A missed-check-in release is not a cancellation procedure.
+
+Choose the rubric level that best describes the policy. Clear instructions for two tasks do not make up for an essential omission in the third.
+</system>
+
+<user>
+{{ text }}
+</user>
