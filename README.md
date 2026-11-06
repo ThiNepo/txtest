@@ -6,13 +6,13 @@ Unit tests for written content.
 
 ## Installation
 
-Requires Python 3.11 or later. Install from this repository:
+Requires Python 3.11 or later. Install from [PyPI](https://pypi.org/project/txtest/):
 
 ```bash
-git clone https://github.com/ThiNepo/txtest.git
-cd txtest
-python -m pip install .
+python -m pip install --upgrade txtest
 ```
+
+The CLI is included in version 0.0.2 and later. Run `txtest --help` to check the installation.
 
 Set `OPENAI_API_KEY` in your environment or create a `.env` file:
 
@@ -24,10 +24,17 @@ OPENAI_API_KEY=your-api-key
 
 ## Quickstart
 
-The repository includes a fictional library desk-reservation policy and two demonstration tests:
+The [repository](https://github.com/ThiNepo/txtest) includes a fictional library desk-reservation policy and two demonstration tests:
 
-- [Cancellation steps](txtests/policies/01-cancellation-steps.txtest): checks whether the policy explains how to cancel a reservation.
-- [Policy clarity](txtests/policies/02-policy-clarity.txtest): scores the policy against five rubric levels.
+- [Cancellation steps](https://github.com/ThiNepo/txtest/blob/main/txtests/policies/01-cancellation-steps.txtest): checks whether the policy explains how to cancel a reservation.
+- [Policy clarity](https://github.com/ThiNepo/txtest/blob/main/txtests/policies/02-policy-clarity.txtest): scores the policy against five rubric levels.
+
+To try these examples, download their files by cloning the repository:
+
+```bash
+git clone https://github.com/ThiNepo/txtest.git
+cd txtest
+```
 
 From the repository root, run:
 
@@ -35,9 +42,9 @@ From the repository root, run:
 txtest examples/reservation-policy.md --set policies
 ```
 
-This evaluates [the complete policy](examples/reservation-policy.md) with every `.txtest` file in `txtests/policies/`, in filename order. Each test makes one request, sequentially, without automatic retries. A failed test or an API error does not stop the remaining tests. Results stay in the terminal.
+This evaluates [the complete policy](https://github.com/ThiNepo/txtest/blob/main/examples/reservation-policy.md) with every `.txtest` file in `txtests/policies/`, in filename order. Each test makes one request, sequentially, without automatic retries. A failed test or an API error does not stop the remaining tests. Results stay in the terminal.
 
-For a demonstration of missing information, try [the incomplete policy](examples/reservation-policy-incomplete.md):
+For a demonstration of missing information, try [the incomplete policy](https://github.com/ThiNepo/txtest/blob/main/examples/reservation-policy-incomplete.md):
 
 ```bash
 txtest examples/reservation-policy-incomplete.md --set policies
@@ -90,7 +97,7 @@ Use `type: predicate` for a yes/no condition. The result is the model's estimate
 
 ### Score tests
 
-Use `type: score` for a rubric with exactly five levels, ordered from lowest to highest. Each entry in `levels` needs a unique string `label` and a nonempty `description`. See the complete [policy clarity test](txtests/policies/02-policy-clarity.txtest) for a concrete rubric.
+Use `type: score` for a rubric with exactly five levels, ordered from lowest to highest. Each entry in `levels` needs a unique string `label` and a nonempty `description`. See the complete [policy clarity test](https://github.com/ThiNepo/txtest/blob/main/txtests/policies/02-policy-clarity.txtest) for a concrete rubric.
 
 The result uses a **1–5 scale**: the API's zero-based score is shifted by one. Fractional scores are preserved and compared with `min_score`, which defaults to `4`, without rounding first. A score equal to the minimum passes. Each test passes or fails independently.
 
@@ -118,4 +125,4 @@ python -m unittest discover -s tests -v
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](https://github.com/ThiNepo/txtest/blob/main/LICENSE).

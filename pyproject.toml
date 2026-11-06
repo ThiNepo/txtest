@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "txtest"
-version = "0.0.1"
+version = "0.0.2"
 description = "Unit testing for texts, courses, articles, and research."
 readme = "README.md"
 requires-python = ">=3.11"
