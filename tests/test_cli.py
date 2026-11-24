@@ -50,6 +50,26 @@ class CommandTests(unittest.TestCase):
     def invoke(self, *options):
         return self.runner.invoke(main, ["file.md", "--set", "lessons", *options], terminal_width=120)
 
+    def test_install_creates_and_updates_the_project_skill(self):
+        destination = Path(".agents/skills/txtest/SKILL.md")
+        result = self.runner.invoke(main, ["install"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        original = destination.read_bytes()
+        self.assertIn(b"name: txtest", original)
+        self.assertIn(b"--block", original)
+
+        destination.write_text("Previous version", encoding="utf-8")
+        other_file = destination.with_name("local-notes.md")
+        other_file.write_text("Project notes", encoding="utf-8")
+        result = self.runner.invoke(main, ["install"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(destination.read_bytes(), original)
+        self.assertEqual(other_file.read_text(encoding="utf-8"), "Project notes")
+
+        result = self.runner.invoke(main, ["install", "--target", "custom skills"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(Path("custom skills/txtest/SKILL.md").read_bytes(), original)
+
     def test_block_filters_apply_to_api_input_and_preserve_the_source_file(self):
         self.write_test("example")
         shared = "Shared text\n\n````markdown\n[language python]\n[endlanguage]\n````\n\n"

@@ -33,3 +33,6 @@ txtest = "txtest.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+txtest = ["skills/txtest/SKILL.md"]

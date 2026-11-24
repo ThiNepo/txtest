@@ -22,6 +22,16 @@ OPENAI_API_KEY=your-api-key
 
 `txtest` looks for `.env` in the current directory and its parents. An existing environment variable takes precedence.
 
+## Install the project skill
+
+From your project's root, run:
+
+```bash
+txtest install
+```
+
+This copies the bundled skill to `.agents/skills/txtest/SKILL.md`. Run it again to update that file. Use `--target DIRECTORY` to select a different skills directory. The command is also available as `python -m txtest install`.
+
 ## Quickstart
 
 The [repository](https://github.com/ThiNepo/txtest) includes a fictional library desk-reservation policy and two demonstration tests:

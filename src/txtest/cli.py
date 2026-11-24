@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import os
+import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
+from importlib.resources import files
 from pathlib import Path
 
 import click
@@ -27,6 +30,31 @@ class CommandError(click.ClickException):
     """An execution error, distinct from a failed text assertion."""
 
     exit_code = 2
+
+
+class _TxtestCommand(click.Command):
+    def main(self, args: Sequence[str] | None = None, prog_name: str | None = None, **kwargs):
+        command_args = sys.argv[1:] if args is None else args
+        if command_args and command_args[0] == "install":
+            return _install.main(command_args[1:], prog_name=f"{prog_name or 'txtest'} install", **kwargs)
+        return super().main(args, prog_name=prog_name, **kwargs)
+
+
+@click.command("install", context_settings={"help_option_names": ["-h", "--help"]})
+@click.option(
+    "--target", default=".agents/skills", show_default=True,
+    type=click.Path(file_okay=False, path_type=Path), help="Directory where skills are installed.",
+)
+def _install(target: Path) -> None:
+    """Install the bundled txtest skill in the current project."""
+    destination = target / "txtest" / "SKILL.md"
+    try:
+        skill = files("txtest").joinpath("skills", "txtest", "SKILL.md").read_bytes()
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(skill)
+    except OSError as error:
+        raise CommandError(f"Could not install the txtest skill: {error}") from None
+    click.echo(f"Installed skill 'txtest' at: {destination}")
 
 
 @dataclass
@@ -150,7 +178,7 @@ def _execute(rows: list[_Row], runner: TestRunner, console: Console) -> None:
             live.update(_table(rows), refresh=True)
 
 
-@click.command(context_settings={"help_option_names": ["-h", "--help"]})
+@click.command(cls=_TxtestCommand, context_settings={"help_option_names": ["-h", "--help"]})
 @click.argument(
     "file",
     type=click.Path(exists=True, dir_okay=False, readable=True, path_type=Path),
@@ -166,6 +194,8 @@ def main(ctx: click.Context, file: Path, test_set: str, blocks: tuple[str, ...])
     """Evaluate FILE against every .txtest in the selected set.
 
     Each test runs once. Results stay in the terminal.
+
+    Run `txtest install` to install the bundled project skill.
     """
     paths = _discover_tests(test_set)
     try:
