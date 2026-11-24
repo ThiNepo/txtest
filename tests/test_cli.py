@@ -47,8 +47,52 @@ class CommandTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def invoke(self):
-        return self.runner.invoke(main, ["file.md", "--set", "lessons"], terminal_width=120)
+    def invoke(self, *options):
+        return self.runner.invoke(main, ["file.md", "--set", "lessons", *options], terminal_width=120)
+
+    def test_block_filters_apply_to_api_input_and_preserve_the_source_file(self):
+        self.write_test("example")
+        shared = "Shared text\n\n````markdown\n[language python]\n[endlanguage]\n````\n\n"
+        source = shared + (
+            "[language cpp]\nC++ text\n"
+            "[audience beginner]\nBeginner text\n[endaudience]\n"
+            "[audience advanced]\nAdvanced text\n[endaudience]\n[endlanguage]\n"
+            "[language python]\nPython text\n[endlanguage]\n"
+            "[language ruby]\nRuby text\n[endlanguage]\n"
+            "[note extra]\nUntouched note\n[endnote]\n"
+        )
+        file = Path("file.md")
+        file.write_text(source, encoding="utf-8")
+        expected = shared + "C++ text\nBeginner text\nPython text\n[note extra]\nUntouched note\n[endnote]\n"
+
+        with patch("txtest.cli.DecisionsClient") as client:
+            client.return_value.create.return_value = {
+                "answers": [{"name": "example", "type": "predicate", "probability": 0.9}],
+            }
+            result = self.invoke("--block", "language:cpp", "--block", "language:python",
+                                 "--block", "audience:beginner")
+            self.assertEqual(result.exit_code, 0, result.output)
+            self.assertEqual(client.return_value.create.call_args.args[0]["input"], expected)
+
+            result = self.invoke()
+            self.assertEqual(result.exit_code, 0, result.output)
+            self.assertEqual(client.return_value.create.call_args.args[0]["input"], source)
+
+        self.assertEqual(file.read_text(encoding="utf-8"), source)
+
+    def test_block_errors_stop_before_api_requests(self):
+        self.write_test("example")
+        for source, selector, message in (
+            ("Shared", "language", "Invalid --block value"),
+            ("[language python]\nHidden\n", "language:cpp", "missing [endlanguage]"),
+            ("[endlanguage]\nShared\n", "language:cpp", "unexpected [endlanguage]"),
+        ):
+            with self.subTest(source=source, selector=selector), patch("txtest.cli.DecisionsClient") as client:
+                Path("file.md").write_text(source, encoding="utf-8")
+                result = self.invoke("--block", selector)
+                self.assertEqual(result.exit_code, 2, result.output)
+                self.assertIn(message, result.output)
+                client.assert_not_called()
 
     def test_sorted_sequential_calls_continue_after_failure_and_show_descriptions(self):
         self.write_test("z_last", "Develops the reasoning naturally.")

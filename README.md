@@ -58,6 +58,18 @@ The module entry point works too:
 python -m txtest examples/reservation-policy.md --set policies
 ```
 
+## Selecting blocks
+
+Use `--block TYPE:VALUE` to evaluate one reading of a file with conditional content.
+
+```bash
+txtest guide.md --set guides --block language:cpp
+```
+
+Write `[TYPE VALUE]` and `[endTYPE]` on their own lines. This command keeps the shared text and the body of each `[language cpp]` block. It removes the markers and skips other `language` blocks. Blocks of types you do not select stay as written, and markers inside fenced code are literal text.
+
+Repeat `--block` to select more than one value or type. For example, `--block language:cpp --block language:python --block audience:beginner` keeps both programming languages and selects the beginner audience. A nested block is visible only when its enclosing blocks are visible. Without `--block`, the full file is evaluated.
+
 ## Writing tests
 
 Keep each test in `txtests/<set>/<name>.txtest`. Sets are resolved from the current directory, and the input is one UTF-8 text file.
@@ -85,7 +97,7 @@ The templates have three variables:
 
 | Variable | Value |
 | --- | --- |
-| `text` | The full contents of the input file. |
+| `text` | The input text after applying any `--block` filters. |
 | `filename` | The input file's name. |
 | `path` | The input path provided to the command. |
 

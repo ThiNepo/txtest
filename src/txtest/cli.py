@@ -18,6 +18,7 @@ from rich.table import Table
 from rich.text import Text
 
 from . import __version__
+from .blocks import filter_blocks
 from .definitions import DefinitionError, PreparedTest
 from .runner import DecisionsClient, TestResult, TestRunner
 
@@ -155,9 +156,13 @@ def _execute(rows: list[_Row], runner: TestRunner, console: Console) -> None:
     type=click.Path(exists=True, dir_okay=False, readable=True, path_type=Path),
 )
 @click.option("--set", "test_set", required=True, metavar="NAME", help="Test set in txtests/NAME.")
+@click.option(
+    "--block", "blocks", multiple=True, metavar="TYPE:VALUE",
+    help="Keep blocks of this type with the given value. May be repeated.",
+)
 @click.version_option(version=__version__, prog_name="txtest")
 @click.pass_context
-def main(ctx: click.Context, file: Path, test_set: str) -> None:
+def main(ctx: click.Context, file: Path, test_set: str, blocks: tuple[str, ...]) -> None:
     """Evaluate FILE against every .txtest in the selected set.
 
     Each test runs once. Results stay in the terminal.
@@ -167,6 +172,11 @@ def main(ctx: click.Context, file: Path, test_set: str) -> None:
         text = file.read_text(encoding="utf-8-sig")
     except (OSError, UnicodeError):
         raise CommandError(f"Could not read {file} as UTF-8 text.") from None
+
+    try:
+        text = filter_blocks(text, blocks)
+    except ValueError as error:
+        raise CommandError(str(error)) from None
 
     rows = []
     for path in paths:
