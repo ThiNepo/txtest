@@ -145,6 +145,20 @@ Run the offline test suite with:
 python -m unittest discover -s tests -v
 ```
 
+## Build and publish
+
+Install the build tool once with `python -m pip install build`. From the repository root, start with an empty `dist/` directory and run the build.
+
+```bash
+python -m build
+```
+
+The build creates a wheel (`.whl`) and a source distribution (`.tar.gz`) in `dist/`. To publish them to PyPI, run the upload separately.
+
+```bash
+twine upload dist/*
+```
+
 ## License
 
 Apache-2.0. See [LICENSE](https://github.com/ThiNepo/txtest/blob/main/LICENSE).
