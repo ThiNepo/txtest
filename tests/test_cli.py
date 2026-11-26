@@ -48,7 +48,38 @@ class CommandTests(unittest.TestCase):
         )
 
     def invoke(self, *options):
-        return self.runner.invoke(main, ["file.md", "--set", "lessons", *options], terminal_width=120)
+        return self.runner.invoke(
+            main, ["file.md", "--set", "lessons", "--provider", "decisions", *options], terminal_width=120,
+        )
+
+    def test_jev_is_the_default_and_reads_its_own_dotenv_key(self):
+        self.write_test("example", extra="model: gpt-6-luna\n")
+        dotenv = Path(".env")
+        dotenv.write_text("TYPESAFE_API_KEY=dotenv-jev-key\n", encoding="utf-8")
+        args = ["file.md", "--set", "lessons"]
+        with (
+            patch.dict(os.environ),
+            patch("txtest.cli.find_dotenv", return_value=str(dotenv.resolve())),
+            patch("txtest.cli.JevClient") as jev,
+            patch("txtest.cli.DecisionsClient") as decisions,
+        ):
+            os.environ.pop("TYPESAFE_API_KEY", None)
+            jev.return_value.create.return_value = {
+                "answers": [{"name": "example", "type": "predicate", "probability": 0.9}],
+            }
+            result = self.runner.invoke(main, args)
+            self.assertEqual(result.exit_code, 0, result.output)
+            self.assertIn("Provider: jev", result.output)
+            jev.assert_called_once_with("dotenv-jev-key")
+            decisions.assert_not_called()
+
+    def test_jev_requires_its_own_key_even_when_an_openai_key_exists(self):
+        self.write_test("example")
+        with patch.dict(os.environ, {"TYPESAFE_API_KEY": ""}), patch("txtest.cli.JevClient") as jev:
+            result = self.runner.invoke(main, ["file.md", "--set", "lessons"])
+        self.assertEqual(result.exit_code, 2, result.output)
+        self.assertIn("Set TYPESAFE_API_KEY", result.output)
+        jev.assert_not_called()
 
     def test_install_creates_and_updates_the_project_skill(self):
         destination = Path(".agents/skills/txtest/SKILL.md")

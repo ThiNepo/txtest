@@ -1,4 +1,4 @@
-"""Offline checks for the Decisions transport and pass/fail interpretation."""
+"""Offline checks for evaluation requests and pass/fail interpretation."""
 
 import io
 import json
@@ -10,8 +10,10 @@ from unittest.mock import Mock, patch
 from txtest.definitions import PreparedTest
 from txtest.runner import (
     ENDPOINT,
+    JEV_ENDPOINT,
     DecisionError,
     DecisionsClient,
+    JevClient,
     TestRunner,
     _NoRedirect,
 )
@@ -153,6 +155,51 @@ class TransportTests(unittest.TestCase):
         for key in (None, "", "  ", "key\nvalue"):
             with self.subTest(key=key), self.assertRaises(DecisionError):
                 DecisionsClient(key)
+
+
+class JevTests(unittest.TestCase):
+    def test_predicate_uses_noul_and_preserves_the_probability(self):
+        response = {"answers": {"reasoning": {"type": "noul", "noul": 0.49}}}
+        with patch.object(urllib.request.OpenerDirector, "open", return_value=io.BytesIO(json.dumps(response).encode())) as network:
+            result = TestRunner(JevClient(FAKE_KEY)).run(prepared())
+        network.assert_called_once()
+        request = network.call_args.args[0]
+        self.assertEqual(request.full_url, JEV_ENDPOINT)
+        self.assertEqual(request.get_header("Authorization"), "Bearer " + FAKE_KEY)
+        self.assertEqual(json.loads(request.data), {
+            "model": "jev-latest",
+            "state": "A text to evaluate.",
+            "questions": {"reasoning": {"type": "noul", "instructions": "Evaluate it."}},
+        })
+        self.assertEqual((result.status, result.value), ("FAIL", 0.49))
+
+    def test_score_sends_ordered_criteria_and_preserves_fractional_scores(self):
+        test = prepared("score")
+        test.payload["questions"][0]["levels"] = [
+            {"label": str(i), "description": f"Anchor {i}."} for i in range(1, 6)
+        ]
+        response = {"answers": {"reasoning": {"type": "score", "score": 3.25}}}
+        with patch.object(urllib.request.OpenerDirector, "open", return_value=io.BytesIO(json.dumps(response).encode())) as network:
+            result = TestRunner(JevClient(FAKE_KEY)).run(test)
+        network.assert_called_once()
+        question = json.loads(network.call_args.args[0].data)["questions"]["reasoning"]
+        self.assertEqual(question, {
+            "type": "score", "instructions": "Evaluate it.",
+            "criteria": [f"{i}: Anchor {i}." for i in range(1, 6)],
+        })
+        self.assertEqual((result.status, result.value), ("PASS", 4.25))
+
+    def test_wrong_answer_name_or_shape_produces_an_error(self):
+        valid = {"type": "noul", "noul": 0.9}
+        for answers in (
+            [valid], {"different": valid}, {"reasoning": valid, "different": valid},
+            {"reasoning": {"type": "predicate", "probability": 0.9}},
+            {"reasoning": {"type": "noul", "noul": 1.01}},
+        ):
+            body = io.BytesIO(json.dumps({"answers": answers}).encode())
+            with self.subTest(answers=answers), patch.object(urllib.request.OpenerDirector, "open", return_value=body):
+                result = TestRunner(JevClient(FAKE_KEY)).run(prepared())
+                self.assertEqual((result.status, result.value), ("ERROR", None))
 
 
 if __name__ == "__main__":

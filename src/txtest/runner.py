@@ -1,4 +1,4 @@
-"""Run one Decisions API request per text test."""
+"""Run one evaluation request per text test."""
 
 from __future__ import annotations
 
@@ -12,6 +12,9 @@ from .definitions import PreparedTest
 
 
 ENDPOINT = "https://api.openai.com/v1/decisions"
+JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
+DECISIONS_KEY_ENV = "OPENAI_API_KEY"
+JEV_KEY_ENV = "TYPESAFE_API_KEY"
 
 
 class DecisionError(Exception):
@@ -20,18 +23,22 @@ class DecisionError(Exception):
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        raise DecisionError("The Decisions API request was redirected; the request was stopped.")
+        raise DecisionError("The evaluation API redirected the request. The request was stopped.")
 
 
-class DecisionsClient:
+class _JsonClient:
     """Send requests once, without automatic retries or HTTP redirects."""
+
+    endpoint: str
+    api_name: str
+    key_env: str
 
     def __init__(self, api_key: str, timeout: float = 60.0):
         if not isinstance(api_key, str) or not api_key.strip():
-            raise DecisionError("OPENAI_API_KEY is missing.")
+            raise DecisionError(f"{self.key_env} is missing.")
         api_key = api_key.strip()
         if any(character.isspace() for character in api_key):
-            raise DecisionError("OPENAI_API_KEY contains whitespace.")
+            raise DecisionError(f"{self.key_env} contains whitespace.")
         self._api_key = api_key
         self.timeout = timeout
         self.opener = urllib.request.build_opener(_NoRedirect())
@@ -43,7 +50,7 @@ class DecisionsClient:
             raise DecisionError("The test request could not be encoded as JSON.") from None
 
         request = urllib.request.Request(
-            ENDPOINT,
+            self.endpoint,
             data=body,
             method="POST",
             headers={
@@ -57,14 +64,53 @@ class DecisionsClient:
         except urllib.error.HTTPError as error:
             code = error.code
             error.close()
-            raise DecisionError(f"The Decisions API returned HTTP {code}.") from None
+            raise DecisionError(f"The {self.api_name} returned HTTP {code}.") from None
         except (urllib.error.URLError, TimeoutError, OSError):
-            raise DecisionError("The Decisions API request failed or timed out.") from None
+            raise DecisionError(f"The {self.api_name} request failed or timed out.") from None
         except (json.JSONDecodeError, UnicodeDecodeError):
-            raise DecisionError("The Decisions API returned invalid JSON.") from None
+            raise DecisionError(f"The {self.api_name} returned invalid JSON.") from None
         if not isinstance(result, dict):
-            raise DecisionError("The Decisions API returned an invalid response object.")
+            raise DecisionError(f"The {self.api_name} returned an invalid response object.")
         return result
+
+
+class DecisionsClient(_JsonClient):
+    endpoint = ENDPOINT
+    api_name = "Decisions API"
+    key_env = DECISIONS_KEY_ENV
+
+
+class JevClient(_JsonClient):
+    endpoint = JEV_ENDPOINT
+    api_name = "Jev API"
+    key_env = JEV_KEY_ENV
+
+    def create(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Translate the prepared question and normalize Jev's named answer."""
+        (question,) = payload["questions"]
+        name = question["name"]
+        kind = "noul" if question["type"] == "predicate" else "score"
+        jev_question: dict[str, Any] = {"type": kind, "instructions": question["instructions"]}
+        if kind == "score":
+            jev_question["criteria"] = [
+                f"{level['label']}: {level['description']}" for level in question["levels"]
+            ]
+        response = super().create({
+            "model": "jev-latest",
+            "state": payload["input"],
+            "questions": {name: jev_question},
+        })
+        answers = response.get("answers")
+        if not isinstance(answers, dict) or len(answers) != 1:
+            raise DecisionError("The Jev API must return exactly one answer for this test.")
+        answer = answers.get(name)
+        if not isinstance(answer, dict):
+            raise DecisionError("The Jev API returned no valid answer for this test.")
+        if answer.get("type") not in (kind, "refusal"):
+            raise DecisionError("The Jev API returned an unexpected answer type.")
+        if answer["type"] == "noul":
+            answer = {"type": "predicate", "probability": answer.get("noul")}
+        return {"answers": [{**answer, "name": name}]}
 
 
 @dataclass(frozen=True)
@@ -76,9 +122,9 @@ class TestResult:
 
 
 class TestRunner:
-    """Evaluate tests once and interpret their Decisions API answers."""
+    """Evaluate tests once and apply the same thresholds for either provider."""
 
-    def __init__(self, client: DecisionsClient):
+    def __init__(self, client: _JsonClient):
         self.client = client
 
     def run(self, test: PreparedTest) -> TestResult:
@@ -91,17 +137,17 @@ class TestRunner:
 
     def _decode_result(self, test: PreparedTest, response: dict[str, Any]) -> TestResult:
         if not isinstance(response, dict):
-            raise DecisionError("The Decisions API returned an invalid response object.")
+            raise DecisionError("The evaluation API returned an invalid response object.")
         answers = response.get("answers")
         if not isinstance(answers, list) or len(answers) != 1:
-            raise DecisionError("The Decisions API must return exactly one answer for this test.")
+            raise DecisionError("The evaluation API must return exactly one answer for this test.")
         answer = answers[0]
         if not isinstance(answer, dict) or answer.get("name") != test.name:
-            raise DecisionError("The Decisions API returned an answer for a different test.")
+            raise DecisionError("The evaluation API returned an answer for a different test.")
         if answer.get("type") == "refusal":
             raise DecisionError("The model refused to evaluate this test.")
         if answer.get("type") != test.kind:
-            raise DecisionError("The Decisions API returned an unexpected answer type.")
+            raise DecisionError("The evaluation API returned an unexpected answer type.")
 
         if test.kind == "predicate":
             value = self._number(answer.get("probability"), "probability", 0, 1)
@@ -121,5 +167,5 @@ class TestRunner:
             or not isinstance(value, (int, float))
             or not minimum <= value <= maximum
         ):
-            raise DecisionError(f"The Decisions API returned an invalid {label}.")
+            raise DecisionError(f"The evaluation API returned an invalid {label}.")
         return float(value)

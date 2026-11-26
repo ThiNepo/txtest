@@ -23,7 +23,15 @@ from rich.text import Text
 from . import __version__
 from .blocks import filter_blocks
 from .definitions import DefinitionError, PreparedTest
-from .runner import DecisionsClient, TestResult, TestRunner
+from .runner import (
+    DECISIONS_KEY_ENV,
+    JEV_KEY_ENV,
+    DecisionError,
+    DecisionsClient,
+    JevClient,
+    TestResult,
+    TestRunner,
+)
 
 
 class CommandError(click.ClickException):
@@ -100,18 +108,18 @@ def _discover_tests(set_name: str) -> list[Path]:
     return paths
 
 
-def _read_api_key() -> str:
+def _read_api_key(variable: str) -> str:
     try:
         dotenv_path = find_dotenv(usecwd=True)
         if dotenv_path:
             load_dotenv(dotenv_path, override=False)
     except (OSError, UnicodeError):
         raise CommandError("Could not read the .env file.") from None
-    key = os.environ.get("OPENAI_API_KEY", "")
+    key = os.environ.get(variable, "")
     if not key.strip():
-        raise CommandError("Set OPENAI_API_KEY in your environment or a .env file.")
+        raise CommandError(f"Set {variable} in your environment or a .env file.")
     if any(character.isspace() for character in key):
-        raise CommandError("OPENAI_API_KEY must not contain whitespace.")
+        raise CommandError(f"{variable} must not contain whitespace.")
     return key
 
 
@@ -185,12 +193,16 @@ def _execute(rows: list[_Row], runner: TestRunner, console: Console) -> None:
 )
 @click.option("--set", "test_set", required=True, metavar="NAME", help="Test set in txtests/NAME.")
 @click.option(
+    "--provider", type=click.Choice(["jev", "decisions"]), default="jev",
+    show_default=True, help="Evaluation provider.",
+)
+@click.option(
     "--block", "blocks", multiple=True, metavar="TYPE:VALUE",
     help="Keep blocks of this type with the given value. May be repeated.",
 )
 @click.version_option(version=__version__, prog_name="txtest")
 @click.pass_context
-def main(ctx: click.Context, file: Path, test_set: str, blocks: tuple[str, ...]) -> None:
+def main(ctx: click.Context, file: Path, test_set: str, provider: str, blocks: tuple[str, ...]) -> None:
     """Evaluate FILE against every .txtest in the selected set.
 
     Each test runs once. Results stay in the terminal.
@@ -221,12 +233,16 @@ def main(ctx: click.Context, file: Path, test_set: str, blocks: tuple[str, ...])
     console = Console(highlight=False)
     heading = Text(str(file), style="bold")
     heading.append(f"\nSet: {test_set}  ·  {len(rows)} test{'s' if len(rows) != 1 else ''}", style="dim")
+    heading.append(f"  ·  Provider: {provider}", style="dim")
     console.print(Panel(heading, title=Text("txtest", style="bold cyan"), border_style="cyan"))
 
     if any(row.test is not None for row in rows):
         try:
-            client = DecisionsClient(_read_api_key())
-        except (CommandError, ValueError) as error:
+            if provider == "jev":
+                client = JevClient(_read_api_key(JEV_KEY_ENV))
+            else:
+                client = DecisionsClient(_read_api_key(DECISIONS_KEY_ENV))
+        except (CommandError, DecisionError) as error:
             for row in rows:
                 if row.test is not None:
                     row.error = str(error)
