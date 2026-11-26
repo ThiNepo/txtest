@@ -38,6 +38,23 @@ class DefinitionTests(unittest.TestCase):
         self.assertEqual(test.description, "Develops each step clearly.")
         self.assertEqual(test.minimum, 0.5)
 
+    def test_instruct_is_optional_author_metadata_not_sent_or_rendered(self):
+        for config in (self.predicate(), self.score()):
+            with self.subTest(config=config):
+                self.write(config)
+                plain = PreparedTest.load(self.path, "Lesson", self.source)
+                self.write({**config, "instruct": "Escreva para iniciantes.\n{{ not_a_template }}"})
+                guided = PreparedTest.load(self.path, "Lesson", self.source)
+                self.assertEqual(guided.payload, plain.payload)
+                self.assertEqual(guided.minimum, plain.minimum)
+
+    def test_instruct_must_be_nonempty_text_when_present(self):
+        for value in (None, False, 1, [], {}, "", "  "):
+            with self.subTest(value=value):
+                self.write(self.predicate(instruct=value))
+                with self.assertRaisesRegex(DefinitionError, "instruct"):
+                    PreparedTest.load(self.path, "Lesson", self.source)
+
     def test_score_defaults_to_minimum_four_and_keeps_ordered_anchors(self):
         config = self.score()
         self.write(config)

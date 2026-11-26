@@ -21,7 +21,7 @@ _BLOCKS = re.compile(
     r"\s*<user>(?P<input>.*?)</user>\s*\Z",
     re.DOTALL,
 )
-_KEYS = {"description", "type", "min_score", "min_probability", "levels", "model"}
+_KEYS = {"description", "instruct", "type", "min_score", "min_probability", "levels", "model"}
 
 
 class DefinitionError(ValueError):
@@ -61,6 +61,11 @@ class PreparedTest:
         description = config.get("description")
         if not isinstance(description, str) or not description.strip():
             raise DefinitionError("Provide a short, nonempty 'description' for the terminal output.")
+        if "instruct" in config:
+            # Author guidance stays in the rubric, outside the rendering context and API payload.
+            guidance = config["instruct"]
+            if not isinstance(guidance, str) or not guidance.strip():
+                raise DefinitionError("'instruct' must be a nonempty string when provided.")
         kind = config.get("type", "score")
         if kind not in ("predicate", "score"):
             raise DefinitionError("'type' must be 'predicate' or 'score'.")
