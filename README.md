@@ -2,7 +2,7 @@
 
 Unit tests for written content.
 
-`txtest` evaluates a text file against criteria you define with the OpenAI Decisions API. Each test produces a `PASS`, `FAIL`, or `ERROR`, with a short description and its value and threshold shown in the terminal.
+`txtest` evaluates a text file against criteria you define using Jev by TypeSafe AI or the OpenAI Decisions API. Each test produces a `PASS`, `FAIL`, or `ERROR`, with a short description and its value and threshold shown in the terminal.
 
 ## Installation
 
@@ -14,13 +14,15 @@ python -m pip install --upgrade txtest
 
 The CLI is included in version 0.0.2 and later. Run `txtest --help` to check the installation.
 
-Set `OPENAI_API_KEY` in your environment or create a `.env` file:
+Jev is the default provider. Set `TYPESAFE_API_KEY` in your environment or add it to `.env`.
 
 ```text
-OPENAI_API_KEY=your-api-key
+TYPESAFE_API_KEY=your-typesafe-api-key
 ```
 
 `txtest` looks for `.env` in the current directory and its parents. An existing environment variable takes precedence.
+
+To use the OpenAI Decisions API, set `OPENAI_API_KEY` and pass `--provider decisions`. Use `--provider jev` to select Jev explicitly. Both providers run the same `.txtest` files.
 
 ## Install the project skill
 
@@ -60,7 +62,7 @@ For a demonstration of missing information, try [the incomplete policy](https://
 txtest examples/reservation-policy-incomplete.md --set policies
 ```
 
-Its cancellation procedure is deliberately missing, so the cancellation test is intended to produce `FAIL`. Scores and probabilities are model judgments and may vary between runs; these examples do not prescribe fixed output values.
+Its cancellation procedure is deliberately missing, so the cancellation test is intended to produce `FAIL`. Scores and probabilities are model judgments and may vary by provider and between runs.
 
 The module entry point works too:
 
@@ -89,6 +91,7 @@ A test contains YAML frontmatter followed by Jinja templates in `<system>` and `
 ```text
 ---
 description: Explains how to cancel a reservation.
+instruct: Tell readers where to cancel their reservation and how late they can do it.
 type: predicate
 min_probability: 0.5
 ---
@@ -102,6 +105,8 @@ Does the policy give the reader a concrete procedure for cancelling a reservatio
 ```
 
 `description` is required and appears beside the result so the reader can understand what was checked. The `<system>` block becomes the question instructions; the rendered `<user>` block becomes the text evaluated by that question.
+
+`instruct` is optional author guidance. When writing or revising material for a test set, follow the guidance in the applicable rubrics. When creating or editing a rubric, add this field only if you have a concrete instruction for the author. Its text is not rendered as a template or sent to either evaluation provider.
 
 The templates have three variables:
 
@@ -121,11 +126,11 @@ Use `type: predicate` for a yes/no condition. The result is the model's estimate
 
 Use `type: score` for a rubric with exactly five levels, ordered from lowest to highest. Each entry in `levels` needs a unique string `label` and a nonempty `description`. See the complete [policy clarity test](https://github.com/ThiNepo/txtest/blob/main/txtests/policies/02-policy-clarity.txtest) for a concrete rubric.
 
-The result uses a **1–5 scale**: the API's zero-based score is shifted by one. Fractional scores are preserved and compared with `min_score`, which defaults to `4`, without rounding first. A score equal to the minimum passes. Each test passes or fails independently.
+The result uses a **1–5 scale**. `txtest` shifts the API's zero-based score by one, preserves fractional scores, and compares the result with `min_score`, which defaults to `4`. A score equal to the minimum passes. Each test passes or fails independently.
 
 `score` is the default type when `type` is omitted. Predicate tests use `min_probability`; score tests use `min_score` and `levels`.
 
-The accepted frontmatter fields are `description`, `type`, `min_probability`, `min_score`, `levels`, and `model`. This implementation uses `gpt-6-luna` by default and accepts that same value if `model` is explicitly set.
+The accepted frontmatter fields are `description`, `instruct`, `type`, `min_probability`, `min_score`, `levels`, and `model`. Jev uses `jev-latest`. Decisions uses `gpt-6-luna`, which is also the accepted value for the optional `model` field in existing files. Select the provider with `--provider`.
 
 ## Exit codes
 
